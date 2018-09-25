@@ -96,8 +96,13 @@ NAN_METHOD(XpcConnection::Setup) {
   info.GetReturnValue().SetUndefined();
 }
 
-xpc_object_t XpcConnection::ValueToXpcObject(Local<Value> value) {
+xpc_object_t XpcConnection::ValueToXpcObject(Local<Context> context, MaybeLocal<Value> maybeValue) {
   xpc_object_t xpcObject = NULL;
+
+  if (maybeValue.IsEmpty())
+    return NULL;
+
+  Local<Value> value = maybeValue.ToLocalChecked();
 
   if (value->IsInt32() || value->IsUint32()) {
     xpcObject = xpc_int64_create(value->IntegerValue());
@@ -108,7 +113,7 @@ xpc_object_t XpcConnection::ValueToXpcObject(Local<Value> value) {
   } else if (value->IsArray()) {
     Local<Array> valueArray = Local<Array>::Cast(value);
 
-    xpcObject = XpcConnection::ArrayToXpcObject(valueArray);
+    xpcObject = XpcConnection::ArrayToXpcObject(context, valueArray);
   } else if (node::Buffer::HasInstance(value)) {
     Local<Object> valueObject = value->ToObject();
 
@@ -122,14 +127,14 @@ xpc_object_t XpcConnection::ValueToXpcObject(Local<Value> value) {
   } else if (value->IsObject()) {
     Local<Object> valueObject = value->ToObject();
 
-    xpcObject = XpcConnection::ObjectToXpcObject(valueObject);
+    xpcObject = XpcConnection::ObjectToXpcObject(context, valueObject);
   } else {
   }
 
   return xpcObject;
 }
 
-xpc_object_t XpcConnection::ObjectToXpcObject(Local<Object> object) {
+xpc_object_t XpcConnection::ObjectToXpcObject(Local<Context> context, Local<Object> object) {
   xpc_object_t xpcObject = xpc_dictionary_create(NULL, NULL, 0);
 
   Local<Array> propertyNames = object->GetPropertyNames();
@@ -140,9 +145,9 @@ xpc_object_t XpcConnection::ObjectToXpcObject(Local<Object> object) {
     if (propertyName->IsString()) {
       Nan::Utf8String propertyNameString(propertyName);
 
-      Local<Value> propertyValue = object->GetRealNamedProperty(propertyName->ToString());
+      MaybeLocal<Value> propertyValue = object->GetRealNamedProperty(context, propertyName->ToString());
 
-      xpc_object_t xpcValue = XpcConnection::ValueToXpcObject(propertyValue);
+      xpc_object_t xpcValue = XpcConnection::ValueToXpcObject(context, propertyValue);
       xpc_dictionary_set_value(xpcObject, *propertyNameString, xpcValue);
       if (xpcValue) {
         xpc_release(xpcValue);
@@ -153,13 +158,13 @@ xpc_object_t XpcConnection::ObjectToXpcObject(Local<Object> object) {
   return xpcObject;
 }
 
-xpc_object_t XpcConnection::ArrayToXpcObject(Local<Array> array) {
+xpc_object_t XpcConnection::ArrayToXpcObject(Local<Context> context, Local<Array> array) {
   xpc_object_t xpcArray = xpc_array_create(NULL, 0);
 
   for(uint32_t i = 0; i < array->Length(); i++) {
-    Local<Value> value = array->Get(i);
+    MaybeLocal<Value> value = array->Get(i);
 
-    xpc_object_t xpcValue = XpcConnection::ValueToXpcObject(value);
+    xpc_object_t xpcValue = XpcConnection::ValueToXpcObject(context, value);
     xpc_array_append_value(xpcArray, xpcValue);
     if (xpcValue) {
       xpc_release(xpcValue);
@@ -272,13 +277,14 @@ void XpcConnection::processEventQueue() {
 NAN_METHOD(XpcConnection::SendMessage) {
   Nan::HandleScope scope;
   XpcConnection* p = node::ObjectWrap::Unwrap<XpcConnection>(info.This());
+  Local<Context> context = info.GetIsolate()->GetCurrentContext();
 
   if (info.Length() > 0) {
     Local<Value> arg0 = info[0];
     if (arg0->IsObject()) {
       Local<Object> object = Local<Object>::Cast(arg0);
 
-      xpc_object_t message = XpcConnection::ObjectToXpcObject(object);
+      xpc_object_t message = XpcConnection::ObjectToXpcObject(context, object);
       p->sendMessage(message);
       xpc_release(message);
     }
