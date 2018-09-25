@@ -23,9 +23,9 @@ private:
   XpcConnection(std::string serviceName);
   ~XpcConnection();
 
-  static xpc_object_t ValueToXpcObject(v8::Local<v8::Value> object);
-  static xpc_object_t ObjectToXpcObject(v8::Local<v8::Object> object);
-  static xpc_object_t ArrayToXpcObject(v8::Local<v8::Array> array);
+  static xpc_object_t ValueToXpcObject(v8::Local<v8::Context> context, v8::MaybeLocal<v8::Value> object);
+  static xpc_object_t ObjectToXpcObject(v8::Local<v8::Context> context, v8::Local<v8::Object> object);
+  static xpc_object_t ArrayToXpcObject(v8::Local<v8::Context> context, v8::Local<v8::Array> array);
 
   static v8::Local<v8::Value> XpcObjectToValue(xpc_object_t xpcObject);
   static v8::Local<v8::Object> XpcDictionaryToObject(xpc_object_t xpcDictionary);
